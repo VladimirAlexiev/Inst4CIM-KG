@@ -12,6 +12,7 @@ This document describes proposed inprovements to the representation of CIM/CGMES
         - [Custom CIM XML Parser](#custom-cim-xml-parser)
     - [Fix Resource URLs](#fix-resource-urls)
     - [Add Datatypes To Instance Data](#add-datatypes-to-instance-data)
+    - [Sample Instance Data](#sample-instance-data)
 
 <!-- markdown-toc end -->
 
@@ -400,14 +401,13 @@ It uses simple string manipulation rather than a XML parser, so it relies on a r
 - A file has exactly one model: `md:FullModel` or `dm:DifferenceModel`
 - `dm:DifferenceModel` has exactly two sections `dm:reverseDifferences` and `dm:forwardDifferences`, in this order
 
-It uses the `owl-cli` tool by `@atextor`, as described at
-  https://github.com/Sveino/Inst4CIM-KG/blob/develop/rdfs-improved#atextor-tools-owl-cli-and-turtle-formatter .
-- It runs a command like this, using the Windows version of the `owl` command:
+It uses command-line tools to do the bulk of the work (see `sub ttl`):
+- For prettier formatting, it runs `owl-cli` by `@atextor` (the Windows version of a batch file)
+  as described at https://github.com/Sveino/Inst4CIM-KG/blob/develop/rdfs-improved#atextor-tools-owl-cli-and-turtle-formatter :
 ```
 owl.bat write --keepUnusedPrefixes -i rdfxml ...rdf ...ttl
 ```
-- `owl` produces better formatting, but for very large files it's better to use streaming.
-  In that case we should use Jena RIOT by changing one line in `sub ttl`:
+- For very large files, give option `-r` to use Jena Riot in streaming mode:
 ```
 riot.bat --syntax=rdfxml --out=ttl ...rdf > ...ttl
 ```
@@ -475,20 +475,22 @@ The URLs of CIM power system resources are represented in CIM XML like this:
 - reference: `rdf:resource="#_44e63d79-6b05-4c64-b490-d181863af7da"`
 
 They have two problems:
-- These are relative URLs. 
-  However, CIM XML files don't specify `xml:base` (see RDF 1.1 XML Syntax, section [2.14 Abbreviating URIs: rdf:ID and xml:base](https://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-ID-xml-base)).
-  This means the URLs are resolved in a tool-dependent way (eg by using the file location on local disk).
-  This is a very serious problem that undermines the stability of resource URLs.
-  We've resolved it by declaring `md:Model.modelingAuthoritySet` as BASE.
-- They start with a parasitic `_`.
-  - The reason is that `rdf:ID` cannot start with a digit, see
-    - RDF 1.1 XML Syntax, section [C.1 RELAX NG Compact Schema](https://www.w3.org/TR/rdf-syntax-grammar/#h3_section-RELAXNG-Schema), `IDsymbol`
-    - XML Schema Definition Language (XSD) 1.1 Part 2: Datatypes, section [3.4.4 NMTOKEN](https://www.w3.org/TR/xmlschema11-2/#NMTOKEN)
-    - Extensible Markup Language (XML) 1.1 (Second Edition) section [Nmtoken](https://www.w3.org/TR/xml11/#NT-Nmtoken)
-  - `rdf:about` could have been used instead of `rdf:ID` to avoid that limitation.
-  - This is a purely cosmetic problem and we may leave it as is.
 
-The problems are fixed by the `cim-trig.pl` script described above: see URL examples in the previous section.
+These are relative URLs. 
+- However, CIM XML files don't specify `xml:base` (see RDF 1.1 XML Syntax, section [2.14 Abbreviating URIs: rdf:ID and xml:base](https://www.w3.org/TR/rdf-syntax-grammar/#section-Syntax-ID-xml-base)).
+- This means the URLs are resolved in a tool-dependent way (eg by using the file location on local disk).
+- This is a very serious problem that undermines the stability of resource URLs.
+- We've resolved it by declaring `md:Model.modelingAuthoritySet` as BASE.
+- This is fixed by the `cim-trig.pl` script described above: see URL examples in the previous section.
+
+They start with a parasitic `_`.
+- The reason is that `rdf:ID` cannot start with a digit, see
+  - RDF 1.1 XML Syntax, section [C.1 RELAX NG Compact Schema](https://www.w3.org/TR/rdf-syntax-grammar/#h3_section-RELAXNG-Schema), `IDsymbol`
+  - XML Schema Definition Language (XSD) 1.1 Part 2: Datatypes, section [3.4.4 NMTOKEN](https://www.w3.org/TR/xmlschema11-2/#NMTOKEN)
+  - Extensible Markup Language (XML) 1.1 (Second Edition) section [Nmtoken](https://www.w3.org/TR/xml11/#NT-Nmtoken)
+- `rdf:about` could have been used instead of `rdf:ID` to avoid that limitation.
+- This is a purely cosmetic problem and we leave it as is.
+
 
 ## Add Datatypes To Instance Data
 https://github.com/Sveino/Inst4CIM-KG/issues/49
@@ -545,4 +547,29 @@ where {
 This update query can be applied on:
 - One CIM file, using an in-memory SPARQL Update tool like Jena `update`
 - A whole repository of CIM data, eg using GraphDB
+
+## Sample Instance Data
+To work out reasoning, validation and performance issues, we need sample instance data.
+We use the following sources:
+- [ENTSO-E_Test_Configurations_v3.0.2](https://www.entsoe.eu/Documents/CIM_documents/Grid_Model_CIM/ENTSO-E_Test_Configurations_v3.0.2.zip): 357 files
+- [Nordic44](https://github.com/Sveino/Nordic44/tree/develop/Instances): 15 files, of which 12 have standard `Model` structure and can be converted to Trig
+
+ENTSO-E files are nested 2-3 levels deep in the folder hierarchy:
+```
+cd ENTSO-E_Test_Configurations_v3.0.2/v3.0
+find . -name *.xml |perl -pe 's{[\w-]+}{*}g' | sort | uniq -c
+     47 ./*/*/*.*
+    310 ./*/*/*/*.*
+```
+
+ls -1 */*.trig | wc -l
+riot.bat --count */*.trig
+```
+
+| dataset                                 | files | quads  |
+|-----------------------------------------|-------|--------|
+|  |       |        |
+|                            |    12 | 35,165 |
+|                                         |       |        |
+
 
